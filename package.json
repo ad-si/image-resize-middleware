@@ -1,5 +1,5 @@
 {
-  "name": "image-resizer",
+  "name": "image-resizer-middleware",
   "version": "0.2.0",
   "description": "Image resizing middleware",
   "main": "index.js",
