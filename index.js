@@ -1,33 +1,36 @@
-var fs = require('fs'),
-	gm = require('gm'),
-	cpus = require('os').cpus(),
-	path = require('path'),
-	url = require('url'),
-	mkdirp = require('mkdirp'),
-	isImage = require('is-image'),
+'use strict'
 
-	idleQueue = [],
-	workers = []
+const fs = require('fs')
+const path = require('path')
+const url = require('url')
+
+const gm = require('gm')
+const os = require('os')
+const mkdirp = require('mkdirp')
+const isImage = require('is-image')
+
+const cpus = os.cpus()
+
+const idleQueue = []
+const workers = []
 
 
 function workOffQueue (worker, firstImage, callback) {
 
 	function afterWrite (error, image) {
 
-		var nextImage
-
 		if (error) {
-			console.error(error)
+			console.error(error.stack)
 			if (image.callback) image.callback(error)
 			return
 		}
 
-		console.log('Created thumbnail for', image.absPath)
+		console.log('Created thumbnail for', image.absolutePath)
 
 		if (typeof image.callback === 'function')
-			image.callback(null, image.absThumbnailPath)
+			image.callback(null, image. absoluteThumbnailPath)
 
-		nextImage = idleQueue.pop()
+		let nextImage = idleQueue.pop()
 
 		if (nextImage) {
 			worker.image = nextImage
@@ -39,30 +42,27 @@ function workOffQueue (worker, firstImage, callback) {
 
 	function convert (image) {
 
-		var width = image.width || image.maxWidth || 200,
-			height = image.height || image.maxHeight || 200,
-			pathDirectories
-
-
-		pathDirectories = image.absThumbnailPath.split('/')
+		let width = image.width || image.maxWidth || 200
+		let height = image.height || image.maxHeight || 200
+		let pathDirectories = image. absoluteThumbnailPath.split('/')
 		pathDirectories.pop()
 
 		mkdirp(path.normalize(pathDirectories.join('/')), function (error) {
 			if (error)
-				console.error(error)
+				console.error(error.stack)
 
 			// TODO: Just try to create file and handle error
-			if (fs.existsSync(image.absThumbnailPath)) {
+			if (fs.existsSync(image. absoluteThumbnailPath)) {
 				callback()
 				return
 			}
 
 			// TODO: Use streams to directly stream the response
-			gm(image.absPath)
+			gm(image.absolutePath)
 				.autoOrient()
 				.resize(width, height, '>')
 				.noProfile()
-				.write(image.absThumbnailPath, function (error) {
+				.write(image. absoluteThumbnailPath, function (error) {
 					afterWrite(error, image)
 				})
 		})
@@ -96,20 +96,17 @@ function addWorker () {
 
 function addToQueue (image) {
 
-	var positionInQueue,
-		processingWorker
-
-	positionInQueue = idleQueue
+	const positionInQueue = idleQueue
 		.map(function (img) {
-			return img.absPath
+			return img.absolutePath
 		})
-		.indexOf(image.absPath)
+		.indexOf(image.absolutePath)
 
-	processingWorker = workers
+	const processingWorker = workers
 		.map(function (worker) {
-			return worker.image.absPath
+			return worker.image.absolutePath
 		})
-		.indexOf(image.absPath)
+		.indexOf(image.absolutePath)
 
 
 	if (positionInQueue != -1 || processingWorker != -1)
@@ -123,54 +120,54 @@ function addToQueue (image) {
 
 module.exports.addToQueue = addToQueue
 
-module.exports.middleware = function (app) {
+module.exports.getMiddleware = function (options) {
+
+	options = options || {}
+	const thumbnailsPath = options.thumbnailsPath ||
+		path.join(__dirname, 'thumbs')
+	const basePath = options.basePath || global.basePath
+
+	console.assert(basePath, 'BasePath is not specified')
 
 	return function (request, response, next) {
 
-		var stream,
-			image,
-			fileUrl = url.parse(request.url, true)
+		const fileUrl = url.parse(request.url, true)
+		const maxWidth = Number(fileUrl.query['max-width'])
+		const maxHeight = Number(fileUrl.query['max-height'])
 
-
-		// Skip middleware if request is not for an image
-		// or not for a scaled image
-		if (!isImage(fileUrl.pathname) ||
-		    (!fileUrl.query.width || !fileUrl.query.height)) {
+		// Skip middleware if request is not for a scaled image
+		if (!isImage(fileUrl.pathname) || !(maxWidth || maxHeight)) {
 			next()
 			return
 		}
 
-		image = {
-			absPath: path.join(global.baseURL, app, fileUrl.pathname),
-			absThumbnailPath: path.join(
-				global.projectURL, 'thumbs', app, fileUrl.pathname
-			),
-			callback: function (error, absThumbnailPath) {
+		const image = {
+			absolutePath: path.join(basePath, fileUrl.pathname),
+			absoluteThumbnailPath: path.join(thumbnailsPath, fileUrl.pathname),
+			maxWidth,
+			maxHeight,
+			callback: (error, absoluteThumbnailPath) => {
 				if (error) {
-					next()
+					next(error)
 					return
 				}
 
 				fs
-					.createReadStream(absThumbnailPath)
+					.createReadStream(absoluteThumbnailPath)
 					.pipe(response)
 			},
-			// TODO: Really serve an image with the specified size
-			width: fileUrl.query.width,
-			height: fileUrl.query.height
 		}
 
+		const stream = fs.createReadStream(image.absoluteThumbnailPath)
 
-		stream = fs.createReadStream(image.absThumbnailPath)
-
-		stream.on('error', function (error) {
-
-			if (error.code === 'ENOENT')
-				addToQueue(image)
-			else {
-				console.error(error)
-				next()
+		stream.on('error', (error) => {
+			if (error.code !== 'ENOENT') {
+				next(error)
+				return
 			}
+
+			// Create thumbnail if it does not exist yet
+			addToQueue(image)
 		})
 
 		stream.pipe(response)
