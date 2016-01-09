@@ -23,7 +23,7 @@ const app = express()
 
 app.use(imageResizer.getMiddleware({
 	basePath: path.join(publicDirectory, 'images'),
-	thumbnailsPath: path.join(publicDirectory, 'thumbs'),
+	thumbnailsPath: path.join(publicDirectory, 'thumbnails'),
 }))
 app.use(express.static(publicDirectory))
 
@@ -39,8 +39,13 @@ will be scaled to the specified value.
 
 For example a request for
 `http://localhost:3000/images/test.png?max-width=50&max-height=50`
-will return an image which is proportionally scaled to a maximum bounding box
-of 50px by 50px.
+triggers the creation of a proportionally scaled thumbnail
+with a maximum bounding box of 50px by 50px.
+It is saved at `$(pwd)/public/thumbnails/test_50x50>.png`
+and responded to the request.
+
+
+## Algorithm
 
 All images to be scaled are added to a queue.
 The queue is worked off with one worker per core.
