@@ -46,11 +46,6 @@ function workOffQueue (worker, firstImage, callback) {
 
 	function convert (image) {
 
-		let modifier = '!'
-
-		if (image.maxWidth || image.maxHeight)
-			modifier = '>'
-
 		const pathDirectories = image.absoluteThumbnailPath.split('/')
 		pathDirectories.pop()
 
@@ -69,11 +64,7 @@ function workOffQueue (worker, firstImage, callback) {
 				// TODO: Use streams to directly stream the response
 				gm(image.absolutePath)
 					.autoOrient()
-					.resize(
-						image.maxWidth || image.width,
-						image.maxHeight || image.height,
-						modifier
-					)
+					.resize(image.width, image.height, image.modifier)
 					.noProfile()
 					.write(
 						image.absoluteThumbnailPath,
@@ -145,6 +136,8 @@ module.exports.getMiddleware = function (options) {
 	return function (request, response, next) {
 
 		const fileUrl = url.parse(request.url, true)
+		const fileExtension = path.extname(fileUrl.pathname)
+		const fileName = path.basename(fileUrl.pathname, fileExtension)
 		const width = Number(fileUrl.query.width)
 		const height = Number(fileUrl.query.height)
 		const maxWidth = Number(fileUrl.query['max-width'])
@@ -159,13 +152,24 @@ module.exports.getMiddleware = function (options) {
 			return
 		}
 
+		const calculatedWidth = maxWidth || width
+		const calculatedHeight = maxHeight || height
+
+		let modifier = '!'
+
+		if (maxWidth || maxHeight)
+			modifier = '>'
+
+		const thumbnailName = fileName + '_' +
+			calculatedWidth + 'x' + calculatedHeight + modifier +
+			fileExtension
+
 		const image = {
 			absolutePath: path.join(basePath, fileUrl.pathname),
-			absoluteThumbnailPath: path.join(thumbnailsPath, fileUrl.pathname),
-			width,
-			height,
-			maxWidth,
-			maxHeight,
+			absoluteThumbnailPath: path.join(thumbnailsPath, thumbnailName),
+			modifier,
+			width: calculatedWidth,
+			height: calculatedHeight,
 			callback: (error, absoluteThumbnailPath) => {
 				if (error) {
 					next(error)
