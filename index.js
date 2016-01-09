@@ -160,13 +160,14 @@ module.exports.getMiddleware = function (options) {
 		if (maxWidth || maxHeight)
 			modifier = '>'
 
-		const thumbnailName = fileName + '_' +
+		const thumbnailPath = fileUrl.pathname
+			.replace(new RegExp(fileExtension + '$'), '') + '_' +
 			calculatedWidth + 'x' + calculatedHeight + modifier +
 			fileExtension
 
 		const image = {
 			absolutePath: path.join(basePath, fileUrl.pathname),
-			absoluteThumbnailPath: path.join(thumbnailsPath, thumbnailName),
+			absoluteThumbnailPath: path.join(thumbnailsPath, thumbnailPath),
 			modifier,
 			width: calculatedWidth,
 			height: calculatedHeight,
