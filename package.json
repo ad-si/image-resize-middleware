@@ -4,11 +4,12 @@
   "description": "Image resizing middleware",
   "main": "index.js",
   "scripts": {
-    "test": "node test/index.js"
+    "test": "rm -rf test/thumbnails && node test/index.js"
   },
   "keywords": [
     "image",
-    "resize"
+    "resize",
+    "middleware"
   ],
   "author": "Adrian Sieber",
   "license": "MIT",

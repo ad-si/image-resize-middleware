@@ -5,18 +5,22 @@ const http = require('http')
 const port = 3000
 
 startServer(port, () => {
+
+	const maxWidth = 50
+	const maxHeight = 50
+
 	http
 		.get(
 			{
 				path: `/apple.png?` +
-					`max-width=50&` +
-					`max-height=50`,
+					`max-width=${maxWidth}&` +
+					`max-height=${maxHeight}`,
 				port
 			},
 			(response) => {
 				response.on('data', data => {
 					const actual = data.length
-					const expected = 4903
+					const expected = 2473
 					console.assert(
 						actual === expected,
 						`actual: ${actual}\nexpected: ${expected}`
