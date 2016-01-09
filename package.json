@@ -4,7 +4,8 @@
   "description": "Image resizing middleware",
   "main": "index.js",
   "scripts": {
-    "test": "rm -rf test/thumbnails && node test/index.js"
+    "test": "rm -rf test/thumbnails && node test/index.js",
+    "prepublish": "npm test"
   },
   "keywords": [
     "image",
