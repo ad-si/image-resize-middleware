@@ -16,5 +16,19 @@
     "gm": "^1.18.1",
     "is-image": "^1.0.1",
     "mkdirp": "^0.5.1"
-  }
+  },
+  "devDependencies": {
+    "express": "^4.13.3"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adius/image-resizer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adius/image-resizer/issues"
+  },
+  "homepage": "https://github.com/adius/image-resizer#readme"
 }
