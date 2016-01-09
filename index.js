@@ -20,15 +20,19 @@ function workOffQueue (worker, firstImage, callback) {
 	function afterWrite (error, image) {
 
 		if (error) {
-			console.error(error.stack)
-			if (image.callback) image.callback(error)
+			callback(error)
+			if (image.callback)
+				image.callback(error)
 			return
 		}
 
-		console.log('Created thumbnail for', image.absolutePath)
+		console.log(
+			'Thumbnail:',
+			image.absolutePath, '->', image.absoluteThumbnailPath
+		)
 
-		if (typeof image.callback === 'function')
-			image.callback(null, image. absoluteThumbnailPath)
+		if (image.callback)
+			image.callback(null, image.absoluteThumbnailPath)
 
 		let nextImage = idleQueue.pop()
 
@@ -42,30 +46,41 @@ function workOffQueue (worker, firstImage, callback) {
 
 	function convert (image) {
 
-		let width = image.width || image.maxWidth || 200
-		let height = image.height || image.maxHeight || 200
-		let pathDirectories = image. absoluteThumbnailPath.split('/')
+		let modifier = '!'
+
+		if (image.maxWidth || image.maxHeight)
+			modifier = '>'
+
+		const pathDirectories = image.absoluteThumbnailPath.split('/')
 		pathDirectories.pop()
 
-		mkdirp(path.normalize(pathDirectories.join('/')), function (error) {
-			if (error)
-				console.error(error.stack)
+		mkdirp(
+			path.normalize(pathDirectories.join('/')),
+			(error) => {
+				if (error)
+					callback(error)
 
-			// TODO: Just try to create file and handle error
-			if (fs.existsSync(image. absoluteThumbnailPath)) {
-				callback()
-				return
+				// TODO: Just try to create file and handle error
+				if (fs.existsSync(image.absoluteThumbnailPath)) {
+					callback()
+					return
+				}
+
+				// TODO: Use streams to directly stream the response
+				gm(image.absolutePath)
+					.autoOrient()
+					.resize(
+						image.maxWidth || image.width,
+						image.maxHeight || image.height,
+						modifier
+					)
+					.noProfile()
+					.write(
+						image.absoluteThumbnailPath,
+						error => afterWrite(error, image)
+					)
 			}
-
-			// TODO: Use streams to directly stream the response
-			gm(image.absolutePath)
-				.autoOrient()
-				.resize(width, height, '>')
-				.noProfile()
-				.write(image. absoluteThumbnailPath, function (error) {
-					afterWrite(error, image)
-				})
-		})
+		)
 	}
 
 	convert(firstImage)
@@ -73,25 +88,23 @@ function workOffQueue (worker, firstImage, callback) {
 
 
 function addWorker () {
+	const currentImage = idleQueue.pop()
 
-	var worker,
-		currentImage = idleQueue.pop()
+	if (!currentImage)
+		return
 
-
-	if (currentImage) {
-
-		worker = {
-			id: new Date(),
-			image: currentImage
-		}
-
-		workers.push(worker)
-
-		workOffQueue(worker, currentImage, function () {
-			workers.splice(workers.indexOf(worker), 1)
-		})
+	const worker = {
+		id: new Date(),
+		image: currentImage
 	}
 
+	workers.push(worker)
+
+	workOffQueue(
+		worker,
+		currentImage,
+		() => workers.splice(workers.indexOf(worker), 1)
+	)
 }
 
 function addToQueue (image) {
@@ -132,11 +145,16 @@ module.exports.getMiddleware = function (options) {
 	return function (request, response, next) {
 
 		const fileUrl = url.parse(request.url, true)
+		const width = Number(fileUrl.query.width)
+		const height = Number(fileUrl.query.height)
 		const maxWidth = Number(fileUrl.query['max-width'])
 		const maxHeight = Number(fileUrl.query['max-height'])
 
-		// Skip middleware if request is not for a scaled image
-		if (!isImage(fileUrl.pathname) || !(maxWidth || maxHeight)) {
+		// Skip middleware if…
+		if (
+			!isImage(fileUrl.pathname) || // is not an image or
+			!(width || height || maxWidth || maxHeight) // has no size parameter
+		) {
 			next()
 			return
 		}
@@ -144,6 +162,8 @@ module.exports.getMiddleware = function (options) {
 		const image = {
 			absolutePath: path.join(basePath, fileUrl.pathname),
 			absoluteThumbnailPath: path.join(thumbnailsPath, fileUrl.pathname),
+			width,
+			height,
 			maxWidth,
 			maxHeight,
 			callback: (error, absoluteThumbnailPath) => {
