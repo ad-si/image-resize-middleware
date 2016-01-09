@@ -4,7 +4,7 @@
   "description": "Image resizing middleware",
   "main": "index.js",
   "scripts": {
-    "test": "mocha test"
+    "test": "node test/index.js"
   },
   "keywords": [
     "image",
